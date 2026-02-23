@@ -1,177 +1,162 @@
-
 import streamlit as st
+import streamlit.components.v1 as components
 
 # ==========================================
-# 1. 页面配置与核心 CSS / JS 引擎
+# 1. 页面配置
 # ==========================================
-st.set_page_config(page_title="N2沉浸式通关引擎 - 第一周", page_icon="⛩️", layout="wide")
+st.set_page_config(page_title="N2沉浸式通关引擎 - 完形填空版", page_icon="⛩️", layout="wide")
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
-    
-    .stApp { background-color: #0d1117; color: #c9d1d9; font-family: 'Noto Sans JP', sans-serif; }
+st.title("⚓ Day 1 - 第1课时：职场与生活效率篇")
+st.markdown("---")
+
+# ==========================================
+# 2. 公共 HTML 头部 (包含 CSS 和 JS 语音引擎)
+# ==========================================
+common_head = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+    body { font-family: 'Noto Sans JP', sans-serif; background-color: #0e1117; color: #c9d1d9; margin: 0; padding: 10px; }
     
     /* 核心词汇卡片 */
-    .word-card {
-        background: #161b22; border: 1px solid #30363d; border-radius: 10px;
-        padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;
-    }
-    .word-jp { font-size: 1.4rem; color: #58a6ff; font-weight: bold; width: 30%; }
-    .word-tr { font-size: 1rem; color: #8b949e; opacity: 0; transition: opacity 0.3s ease; width: 60%; }
-    .word-card:hover .word-tr { opacity: 1; color: #e6edf3; } /* 鼠标悬停显现翻译 */
+    .word-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+    .word-jp { font-size: 1.4rem; color: #58a6ff; font-weight: bold; width: 35%; }
+    .word-kana { font-size: 0.9rem; color: #8b949e; font-weight: normal; }
+    .word-tr { font-size: 1.1rem; color: #c9d1d9; width: 50%; }
     
-    /* 句子解剖交互盒子 */
-    .sentence-box {
-        background: #21262d; border-left: 4px solid #8957e5; border-radius: 8px;
-        padding: 15px; margin-bottom: 15px; cursor: pointer;
-        transition: all 0.3s ease; overflow: hidden; height: 60px;
-    }
-    .sentence-box.expanded { height: auto; background: #161b22; transform: scale(1.02); border-color: #2ea043; }
-    .sen-jp { font-size: 1.3rem; color: #c9d1d9; margin-bottom: 10px; }
-    .sen-tr { display: none; color: #fbbf24; font-size: 1rem; border-top: 1px dashed #30363d; padding-top: 10px; }
-    .sen-note { display: none; color: #8b949e; font-size: 0.9rem; margin-top: 8px; }
-    .sentence-box.expanded .sen-tr, .sentence-box.expanded .sen-note { display: block; }
+    /* 30词网格 */
+    .grid-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .grid-item { background: #161b22; border: 1px solid #30363d; padding: 10px; border-radius: 6px; text-align: center; }
+    .grid-jp { font-size: 1.2rem; color: #58a6ff; font-weight: bold; margin-bottom: 5px; }
+    .grid-tr { font-size: 0.9rem; color: #8b949e; margin-bottom: 8px; }
     
-    /* 前端语音按钮 (瞬间响应) */
-    .play-btn {
-        background: #238636; color: white; border: none; border-radius: 5px;
-        padding: 5px 10px; cursor: pointer; font-size: 1rem; margin-left: 10px;
-    }
+    /* --- 新增：完形填空小作文样式 --- */
+    .essay-container { line-height: 2.2; font-size: 1.3rem; padding: 25px; background: #161b22; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 20px;}
+    .blank { display: inline-block; min-width: 50px; text-align: center; color: #58a6ff; cursor: pointer; font-weight: bold; transition: all 0.2s; border-bottom: 2px dashed #58a6ff; padding: 0 5px; margin: 0 5px; background: rgba(88, 166, 255, 0.1); border-radius: 4px;}
+    .blank:hover { background: rgba(88, 166, 255, 0.2); transform: scale(1.05); }
+    .blank.revealed { color: #ff7b72; border-bottom: 2px solid #ff7b72; background: rgba(255, 123, 114, 0.1); }
+    
+    .analysis-box { margin-top: 20px; padding: 20px; background: #21262d; border-left: 5px solid #2ea043; border-radius: 8px; display: none; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* 播放按钮 */
+    .play-btn { background: #238636; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 1rem; }
     .play-btn:hover { background: #2ea043; }
-    
-    /* 词性颜色标签 */
-    .tag-core { color: #ff7b72; font-weight: bold; } /* 核心词 红色 */
-    .tag-adv { color: #79c0ff; font-weight: bold; }  /* 副词 蓝色 */
-    .tag-conj { color: #d2a8ff; font-weight: bold; } /* 连接词 紫色 */
-    </style>
-
-    <script>
-    function speakJS(text, event) {
-        if(event) event.stopPropagation(); // 阻止点击事件冒泡，防止触发盒子的缩放
-        window.speechSynthesis.cancel();   // 停止上一个语音
-        let msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'ja-JP'; msg.rate = 0.85; msg.pitch = 1.0;
-        window.speechSynthesis.speak(msg);
+</style>
+<script>
+    // 零延迟前端语音引擎
+    function speak(text, event) {
+        if(event) event.stopPropagation();
+        window.speechSynthesis.cancel();
+        let u = new SpeechSynthesisUtterance(text);
+        u.lang = 'ja-JP'; u.rate = 0.85;
+        window.speechSynthesis.speak(u);
     }
-    function toggleBox(element) {
-        element.classList.toggle('expanded');
+    
+    // 完形填空揭晓逻辑
+    function revealAns(id, word, pure_word, note, tr, sentence_audio) {
+        // 1. 填入单词并改变样式
+        let el = document.getElementById('b' + id);
+        el.innerHTML = word;
+        el.classList.add('revealed');
+        
+        // 2. 朗读填入的这个词
+        speak(pure_word);
+        
+        // 3. 显示下方的解析盒子
+        let box = document.getElementById('analysis-box');
+        box.style.display = 'block';
+        document.getElementById('ans-note').innerHTML = "<b>📖 词汇解析：</b>" + note;
+        document.getElementById('ans-tr').innerHTML = "<b>🇨🇳 句子翻译：</b>" + tr;
+        
+        // 4. 更新“朗读此句”按钮的语音内容
+        let audioBtn = document.getElementById('ans-audio');
+        audioBtn.onclick = function() { speak(sentence_audio); };
     }
-    </script>
-""", unsafe_allow_html=True)
-
-
-# ==========================================
-# 2. 课程数据结构 (此处以 Day 1 - L1 为例)
-# ==========================================
-# 未来 180 节课的数据都可以按这个格式填充
-database = {
-    "Day1_L1": {
-        "title": "职场与生活效率篇 (动词精讲)",
-        "core_words": [
-            ("捗る", "はかどる", "进展顺利。例：仕事が捗る。", "はかどる"),
-            ("割り当てる", "わりあてる", "分配。例：仕事を割り当てる。", "わりあてる"),
-            ("備え付ける", "そなえつける", "设置/装备。例：エアコンを備え付ける。", "そなえつける"),
-            ("打ち合わせる", "うちあわせる", "商量。例：詳細を打ち合わせる。", "うちあわせる"),
-            ("見合わせる", "みあわせる", "暂停/推迟。例：出発を見合わせる。", "みあわせる")
-        ],
-        "essay": [
-            {
-                "jp": "今日の仕事は<span class='tag-adv'>とても</span><span class='tag-core'>捗りました</span>。",
-                "pure_jp": "今日の仕事はとても捗りました。", # 用于语音朗读的纯文本
-                "tr": "今天的工作进展非常顺利。",
-                "note": "【とても】副词，修饰后面的核心动词【捗る】(进展顺利)。"
-            },
-            {
-                "jp": "<span class='tag-conj'>なぜなら</span>、上司が適切に業務を<span class='tag-core'>割り当てて</span>くれたからです。",
-                "pure_jp": "なぜなら、上司が適切に業務を割り当ててくれたからです。",
-                "tr": "因为上司妥善地分配了任务。",
-                "note": "【なぜなら】因果连接词；【割り当てる】核心动词，分配。"
-            },
-            {
-                "jp": "会議室には新しいモニターが<span class='tag-core'>備え付けられて</span>おり、スムーズに<span class='tag-core'>打ち合わせる</span>ことができました。",
-                "pure_jp": "会議室には新しいモニターが備え付けられており、スムーズに打ち合わせることができました。",
-                "tr": "会议室里安装了新的显示器，沟通商量得非常顺畅。",
-                "note": "【備え付ける】安装/装备；【打ち合わせる】碰头商量。"
-            }
-        ],
-        "sprint_30": ["合致", "兆し", "素朴", "妥協", "漠然", "閲覧", "一転", "安堵", "会得", "概説", 
-                      "該当", "介入", "各界", "拡充", "確保", "加味", "関与", "慣習", "棄権", "規制", 
-                      "拒絶", "許容", "起用", "議決", "却下", "救済", "強要", "均衡", "駆使", "駆除"]
-    }
-}
-
+</script>
+"""
 
 # ==========================================
-# 3. 侧边栏导航 (第一周专属)
+# 3. 数据层
 # ==========================================
-st.sidebar.title("🏮 第一周：筑基期 (Day 1 - 7)")
-day = st.sidebar.slider("选择学习天数", 1, 7, 1)
-lesson = st.sidebar.radio("选择课时", ["第1课时 (核心精讲)", "第2课时 (强化演练)"])
+core_words = [
+    ("捗る", "はかどる", "进展顺利"), ("割り当てる", "わりあてる", "分配"),
+    ("備え付ける", "そなえつける", "设置/装备"), ("打ち合わせる", "うちあわせる", "碰头商量"),
+    ("見合わせる", "みあわせる", "暂停/推迟"), ("堪える", "こたえる", "吃不消/难受"),
+    ("補う", "おぎなう", "弥补/补偿"), ("廃れる", "すたれる", "过时/衰落"),
+    ("朗らか", "ほがらか", "开朗"), ("妥協", "だきょう", "妥协"),
+    ("執着", "しゅうちゃく", "留恋/执着"), ("漠然", "ばくぜん", "含糊/模糊"),
+    ("閲覧", "えつらん", "阅读/浏览"), ("兆し", "きざし", "前兆/兆头"),
+    ("合致", "がっち", "一致/吻合")
+]
 
-course_key = f"Day{day}_L{1 if '第1' in lesson else 2}"
+# N2 完形填空大段落数据
+essay_full_text = "今日の仕事はとても{b1}。なぜなら、上司が適切に業務を{b2}くれたからです。会議室には新しいモニターが{b3}おり、スムーズに{b4}ことができました。一度は予算の都合で計画を{b5}こともありましたが、{b6}せずに進めば、成功の{b7}が見え、目標に{b8}するはずです。"
 
-st.sidebar.markdown("---")
-st.sidebar.write("🎵 **专注环境控制**")
-if st.sidebar.button("▶️ 播放纯音乐 (Lo-Fi)"):
-    st.sidebar.audio("https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3", format="audio/mp3")
+essay_blanks = [
+    {"id": 1, "word": "捗りました", "pure": "はかどりました", "note": "【捗る】(はかどる)：进展顺利。副词「とても」常与其搭配。", "tr": "今天的工作进展非常顺利。", "audio": "今日の仕事はとても捗りました。"},
+    {"id": 2, "word": "割り当てて", "pure": "わりあてて", "note": "【割り当てる】(わりあてる)：分配。将工作分给合适的人。", "tr": "因为上司妥善地分配了任务。", "audio": "なぜなら、上司が適切に業務を割り当ててくれたからです。"},
+    {"id": 3, "word": "備え付けられて", "pure": "そなえつけられて", "note": "【備え付ける】(そなえつける)：安装、配备。这里使用了状态形式。", "tr": "会议室里安装了新的显示器。", "audio": "会議室には新しいモニターが備え付けられており、スムーズに打ち合わせることができました。"},
+    {"id": 4, "word": "打ち合わせる", "pure": "うちあわせる", "note": "【打ち合わせる】(うちあわせる)：碰头、商量细节。", "tr": "大家沟通商量得非常顺畅。", "audio": "会議室には新しいモニターが備え付けられており、スムーズに打ち合わせることができました。"},
+    {"id": 5, "word": "見合わせる", "pure": "みあわせる", "note": "【見合わせる】(みあわせる)：推迟、暂缓。計画を見合わせる = 暂缓计划。", "tr": "虽然一度因为预算问题暂缓过计划。", "audio": "一度は予算の都合で計画を見合わせることもありましたが、妥協せずに進めば、成功の兆しが見え、目標に合致するはずです。"},
+    {"id": 6, "word": "妥協", "pure": "だきょう", "note": "【妥協】(だきょう)：妥协。妥協せずに = 不妥协地。", "tr": "但如果不妥协地推进...", "audio": "一度は予算の都合で計画を見合わせることもありましたが、妥協せずに進めば、成功の兆しが見え、目標に合致するはずです。"},
+    {"id": 7, "word": "兆し", "pure": "きざし", "note": "【兆し】(きざし)：前兆。成功の兆し = 成功的前兆。", "tr": "就能看到成功的前兆...", "audio": "一度は予算の都合で計画を見合わせることもありましたが、妥協せずに進めば、成功の兆しが見え、目標に合致するはずです。"},
+    {"id": 8, "word": "合致", "pure": "がっち", "note": "【合致】(がっち)：一致。目標に合致する = 符合目标。", "tr": "最终一定能符合我们的目标。", "audio": "一度は予算の都合で計画を見合わせることもありましたが、妥協せずに進めば、成功の兆しが見え、目標に合致するはずです。"}
+]
+
+sprint_30 = [
+    ("合致", "一致"), ("兆し", "前兆"), ("素朴", "纯朴"), ("妥協", "妥协"), ("漠然", "模糊"),
+    ("閲覧", "阅读"), ("一転", "突然改变"), ("安堵", "放心"), ("会得", "领会"), ("概説", "概论"),
+    ("該当", "符合"), ("介入", "干预"), ("各界", "各界"), ("拡充", "扩充"), ("確保", "确保"),
+    ("加味", "加入"), ("関与", "参与"), ("慣習", "习俗"), ("棄権", "弃权"), ("規制", "管制"),
+    ("拒絶", "拒绝"), ("許容", "许可"), ("起用", "启用"), ("議決", "表决"), ("却下", "驳回"),
+    ("救済", "救济"), ("強要", "强迫"), ("均衡", "平衡"), ("駆使", "运用自如"), ("駆除", "驱除")
+]
 
 # ==========================================
-# 4. 主界面渲染逻辑
+# 4. PPT 翻页式布局 (Tabs)
 # ==========================================
-# 获取当前课时数据，如果没有则显示开发中
-data = database.get(course_key, None)
+tab1, tab2, tab3, tab4 = st.tabs(["🎯 1. 课前抽测", "📖 2. 核心精讲 (15词)", "📝 3. N2完形填空实战", "🚀 4. 课后30词扫描"])
 
-if data:
-    st.title(f"⚓ Day {day} - {lesson}：{data['title']}")
+with tab1:
+    st.subheader("🔔 课前 2 分钟回顾")
+    st.info("学习外语最重要的是提取记忆！请在脑海中回想这些词的意思：")
+    st.write("1. 捗る (はかどる)  /  2. 割り当てる (わりあてる)  /  3. 備え付ける (そなえつける)")
 
-    # --- 模块 A: 课前 2 分钟回顾 ---
-    if day > 1 or "第2" in lesson:
-        with st.expander("🔔 课前抽测 (点击展开)"):
-            st.info("凭借记忆写出昨日重点词的意思：")
-            st.text_input("1. 捗る (はかどる)", key="review1")
-            st.text_input("2. 割り当てる (わりあてる)", key="review2")
+with tab2:
+    html_core = common_head + "<div>"
+    for word, kana, trans in core_words:
+        html_core += f'<div class="word-card"><div class="word-jp">{word} <span class="word-kana">({kana})</span></div><div class="word-tr">{trans}</div><button class="play-btn" onclick="speak(\'{word}\')">🔊 读音</button></div>'
+    html_core += "</div>"
+    components.html(html_core, height=600, scrolling=True)
 
-    # --- 模块 B: 核心单词精讲 ---
-    st.markdown("### 📚 核心精讲区")
-    st.caption("💡 提示：鼠标悬停在卡片上显示翻译，点击 🔊 瞬间朗读。")
+# --- PPT 页面 3：完形填空实战重构 ---
+with tab3:
+    st.info("💡 操作指南：通读全段，根据上下文猜测空缺处。**点击【数字】即可揭晓答案并朗读，下方会自动弹出该句的详细解析。**")
     
-    for word, kana, trans, pure_jp in data['core_words']:
-        html_word = f"""
-        <div class="word-card">
-            <div class="word-jp">{word} <span style="font-size:0.8rem;color:#8b949e">({kana})</span></div>
-            <div class="word-tr">{trans}</div>
-            <button class="play-btn" onclick="speakJS('{pure_jp}')">🔊</button>
-        </div>
-        """
-        st.markdown(html_word, unsafe_allow_html=True)
+    # 动态生成带点击事件的填空 HTML
+    generated_essay = essay_full_text
+    for blank in essay_blanks:
+        span_html = f"<span class='blank' id='b{blank['id']}' onclick=\"revealAns('{blank['id']}', '{blank['word']}', '{blank['pure']}', '{blank['note']}', '{blank['tr']}', '{blank['audio']}')\">【 {blank['id']} 】</span>"
+        generated_essay = generated_essay.replace(f"{{b{blank['id']}}}", span_html)
 
-    # --- 模块 C: 沉浸式小作文解剖 (新增极其灵敏的发音) ---
-    st.markdown("---")
-    st.markdown("### 📝 沉浸式小作文解剖")
-    st.caption("💡 提示：点击整个句子方块可**放大并查看解析**。点击句子内的 🔊 按钮可**单独朗读该句**。")
+    html_essay = common_head + f"""
+    <div class="essay-container">
+        {generated_essay}
+    </div>
     
-    for i, sen in enumerate(data['essay']):
-        html_sentence = f"""
-        <div class="sentence-box" onclick="toggleBox(this)">
-            <div class="sen-jp">
-                {sen['jp']}
-                <button class="play-btn" onclick="speakJS('{sen['pure_jp']}', event)">🔊 读此句</button>
-            </div>
-            <div class="sen-tr">🇨🇳 翻译：{sen['tr']}</div>
-            <div class="sen-note">🔍 解析：{sen['note']}</div>
-        </div>
-        """
-        st.markdown(html_sentence, unsafe_allow_html=True)
-
-    # --- 模块 D: 课后 30 词冲刺 ---
-    st.markdown("---")
-    st.markdown("### 🎯 课后 30 词极速扫描")
+    <button class="play-btn" onclick="speak('今日の仕事はとても捗りました。なぜなら、上司が適切に業務を割り当ててくれたからです。会議室には新しいモニターが備え付けられており、スムーズに打ち合わせることができました。一度は予算の都合で計画を見合わせることもありましたが、妥協せずに進めば、成功の兆しが見え、目標に合致するはずです。')">🔊 一键朗读完整段落</button>
     
-    cols = st.columns(6)
-    for i, word in enumerate(data['sprint_30']):
-        with cols[i % 6]:
-            st.markdown(f"<div style='background:#161b22; padding:8px; text-align:center; border-radius:5px; margin-bottom:10px; border:1px solid #30363d;'>{word}</div>", unsafe_allow_html=True)
+    <div id="analysis-box" class="analysis-box">
+        <div id="ans-note" style="color: #fbbf24; font-size: 1.1rem; margin-bottom: 10px;"></div>
+        <div id="ans-tr" style="color: #c9d1d9; font-size: 1rem; margin-bottom: 15px; border-bottom: 1px dashed #30363d; padding-bottom: 10px;"></div>
+        <button class="play-btn" id="ans-audio">🔊 朗读此句</button>
+    </div>
+    """
+    components.html(html_essay, height=700, scrolling=True)
 
-else:
-    st.warning(f"🚧 恭喜你太超前了！{course_key} 的教案数据正在按计划编写导入中，请先复习已有课程。")
+with tab4:
+    html_sprint = common_head + '<div class="grid-container">'
+    for word, trans in sprint_30:
+        html_sprint += f'<div class="grid-item"><div class="grid-jp">{word}</div><div class="grid-tr">{trans}</div><button class="play-btn" style="font-size:0.8rem; padding:4px 8px;" onclick="speak(\'{word}\')">🔊</button></div>'
+    html_sprint += "</div>"
+    components.html(html_sprint, height=600, scrolling=True)
