@@ -1,143 +1,177 @@
 
 import streamlit as st
-import time
 
-# --- 页面基础配置 ---
-st.set_page_config(page_title="N2沉浸式通关引擎", page_icon="🏮", layout="wide")
+# ==========================================
+# 1. 页面配置与核心 CSS / JS 引擎
+# ==========================================
+st.set_page_config(page_title="N2沉浸式通关引擎 - 第一周", page_icon="⛩️", layout="wide")
 
-# --- 沉浸式 CSS 样式 ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
     
-    html, body, [class*="css"] {
-        font-family: 'Noto Sans JP', sans-serif;
-        background-color: #0e1117;
-        color: #ffffff;
-    }
-    .stApp { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); }
+    .stApp { background-color: #0d1117; color: #c9d1d9; font-family: 'Noto Sans JP', sans-serif; }
     
-    /* 学习卡片样式 */
-    .lesson-card {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 25px;
-        border-radius: 20px;
-        margin-bottom: 20px;
-        backdrop-filter: blur(10px);
+    /* 核心词汇卡片 */
+    .word-card {
+        background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+        padding: 15px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;
     }
-    .vocab-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .jp-text { font-size: 1.2rem; font-weight: 500; color: #60a5fa; }
-    .tr-text { color: #94a3b8; font-size: 0.9rem; transition: 0.3s; opacity: 0.1; }
-    .vocab-row:hover .tr-text { opacity: 1; }
+    .word-jp { font-size: 1.4rem; color: #58a6ff; font-weight: bold; width: 30%; }
+    .word-tr { font-size: 1rem; color: #8b949e; opacity: 0; transition: opacity 0.3s ease; width: 60%; }
+    .word-card:hover .word-tr { opacity: 1; color: #e6edf3; } /* 鼠标悬停显现翻译 */
     
-    /* 播放按钮样式 */
+    /* 句子解剖交互盒子 */
+    .sentence-box {
+        background: #21262d; border-left: 4px solid #8957e5; border-radius: 8px;
+        padding: 15px; margin-bottom: 15px; cursor: pointer;
+        transition: all 0.3s ease; overflow: hidden; height: 60px;
+    }
+    .sentence-box.expanded { height: auto; background: #161b22; transform: scale(1.02); border-color: #2ea043; }
+    .sen-jp { font-size: 1.3rem; color: #c9d1d9; margin-bottom: 10px; }
+    .sen-tr { display: none; color: #fbbf24; font-size: 1rem; border-top: 1px dashed #30363d; padding-top: 10px; }
+    .sen-note { display: none; color: #8b949e; font-size: 0.9rem; margin-top: 8px; }
+    .sentence-box.expanded .sen-tr, .sentence-box.expanded .sen-note { display: block; }
+    
+    /* 前端语音按钮 (瞬间响应) */
     .play-btn {
-        background: none;
-        border: none;
-        color: #fbbf24;
-        cursor: pointer;
-        font-size: 1.2rem;
+        background: #238636; color: white; border: none; border-radius: 5px;
+        padding: 5px 10px; cursor: pointer; font-size: 1rem; margin-left: 10px;
     }
+    .play-btn:hover { background: #2ea043; }
+    
+    /* 词性颜色标签 */
+    .tag-core { color: #ff7b72; font-weight: bold; } /* 核心词 红色 */
+    .tag-adv { color: #79c0ff; font-weight: bold; }  /* 副词 蓝色 */
+    .tag-conj { color: #d2a8ff; font-weight: bold; } /* 连接词 紫色 */
     </style>
-    """, unsafe_allow_html=True)
 
-# --- JavaScript 语音引擎 (Web Speech API) ---
-def play_audio(text):
-    js_code = f"""
     <script>
-    var msg = new SpeechSynthesisUtterance('{text}');
-    msg.lang = 'ja-JP';
-    msg.rate = 0.8;
-    window.speechSynthesis.speak(msg);
+    function speakJS(text, event) {
+        if(event) event.stopPropagation(); // 阻止点击事件冒泡，防止触发盒子的缩放
+        window.speechSynthesis.cancel();   // 停止上一个语音
+        let msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'ja-JP'; msg.rate = 0.85; msg.pitch = 1.0;
+        window.speechSynthesis.speak(msg);
+    }
+    function toggleBox(element) {
+        element.classList.toggle('expanded');
+    }
     </script>
-    """
-    st.components.v1.html(js_code, height=0)
+""", unsafe_allow_html=True)
 
-# --- 侧边栏：导航与进度 ---
-st.sidebar.title("🏮 90天 N2 计划")
-current_day = st.sidebar.select_slider("选择日期", options=list(range(1, 91)), value=1)
-current_lesson = st.sidebar.radio("选择课时", ["第1课时 (核心精讲)", "第2课时 (强化训练)"])
+
+# ==========================================
+# 2. 课程数据结构 (此处以 Day 1 - L1 为例)
+# ==========================================
+# 未来 180 节课的数据都可以按这个格式填充
+database = {
+    "Day1_L1": {
+        "title": "职场与生活效率篇 (动词精讲)",
+        "core_words": [
+            ("捗る", "はかどる", "进展顺利。例：仕事が捗る。", "はかどる"),
+            ("割り当てる", "わりあてる", "分配。例：仕事を割り当てる。", "わりあてる"),
+            ("備え付ける", "そなえつける", "设置/装备。例：エアコンを備え付ける。", "そなえつける"),
+            ("打ち合わせる", "うちあわせる", "商量。例：詳細を打ち合わせる。", "うちあわせる"),
+            ("見合わせる", "みあわせる", "暂停/推迟。例：出発を見合わせる。", "みあわせる")
+        ],
+        "essay": [
+            {
+                "jp": "今日の仕事は<span class='tag-adv'>とても</span><span class='tag-core'>捗りました</span>。",
+                "pure_jp": "今日の仕事はとても捗りました。", # 用于语音朗读的纯文本
+                "tr": "今天的工作进展非常顺利。",
+                "note": "【とても】副词，修饰后面的核心动词【捗る】(进展顺利)。"
+            },
+            {
+                "jp": "<span class='tag-conj'>なぜなら</span>、上司が適切に業務を<span class='tag-core'>割り当てて</span>くれたからです。",
+                "pure_jp": "なぜなら、上司が適切に業務を割り当ててくれたからです。",
+                "tr": "因为上司妥善地分配了任务。",
+                "note": "【なぜなら】因果连接词；【割り当てる】核心动词，分配。"
+            },
+            {
+                "jp": "会議室には新しいモニターが<span class='tag-core'>備え付けられて</span>おり、スムーズに<span class='tag-core'>打ち合わせる</span>ことができました。",
+                "pure_jp": "会議室には新しいモニターが備え付けられており、スムーズに打ち合わせることができました。",
+                "tr": "会议室里安装了新的显示器，沟通商量得非常顺畅。",
+                "note": "【備え付ける】安装/装备；【打ち合わせる】碰头商量。"
+            }
+        ],
+        "sprint_30": ["合致", "兆し", "素朴", "妥協", "漠然", "閲覧", "一転", "安堵", "会得", "概説", 
+                      "該当", "介入", "各界", "拡充", "確保", "加味", "関与", "慣習", "棄権", "規制", 
+                      "拒絶", "許容", "起用", "議決", "却下", "救済", "強要", "均衡", "駆使", "駆除"]
+    }
+}
+
+
+# ==========================================
+# 3. 侧边栏导航 (第一周专属)
+# ==========================================
+st.sidebar.title("🏮 第一周：筑基期 (Day 1 - 7)")
+day = st.sidebar.slider("选择学习天数", 1, 7, 1)
+lesson = st.sidebar.radio("选择课时", ["第1课时 (核心精讲)", "第2课时 (强化演练)"])
+
+course_key = f"Day{day}_L{1 if '第1' in lesson else 2}"
 
 st.sidebar.markdown("---")
-st.sidebar.metric("学习时长累计", f"{current_day*80} 分钟")
-st.sidebar.progress(current_day / 90)
+st.sidebar.write("🎵 **专注环境控制**")
+if st.sidebar.button("▶️ 播放纯音乐 (Lo-Fi)"):
+    st.sidebar.audio("https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3", format="audio/mp3")
 
-# --- 主界面逻辑 ---
-st.title(f"Day {current_day}: {current_lesson}")
+# ==========================================
+# 4. 主界面渲染逻辑
+# ==========================================
+# 获取当前课时数据，如果没有则显示开发中
+data = database.get(course_key, None)
 
-# 1. 课前 2 分钟回顾测试 (非第一天第一课时)
-if not (current_day == 1 and current_lesson == "第1课时 (核心精讲)"):
-    with st.expander("🔔 课前 2 分钟：昨日词汇抽测", expanded=True):
-        st.write("请写出下列单词的读音或意思：")
-        st.info("捗る (はかどる) / 堪える (こたえる) / 補う (おぎなう)")
-        ans = st.text_input("在这里输入答案...", placeholder="输入答案后按回车")
-        if ans: st.success("复习得不错！进入今日新课。")
+if data:
+    st.title(f"⚓ Day {day} - {lesson}：{data['title']}")
 
-# 2. 核心教学区
-col1, col2 = st.columns([2, 1])
+    # --- 模块 A: 课前 2 分钟回顾 ---
+    if day > 1 or "第2" in lesson:
+        with st.expander("🔔 课前抽测 (点击展开)"):
+            st.info("凭借记忆写出昨日重点词的意思：")
+            st.text_input("1. 捗る (はかどる)", key="review1")
+            st.text_input("2. 割り当てる (わりあてる)", key="review2")
 
-with col1:
-    st.markdown('<div class="lesson-card">', unsafe_allow_html=True)
-    st.subheader("📖 核心词汇与句型精讲")
+    # --- 模块 B: 核心单词精讲 ---
+    st.markdown("### 📚 核心精讲区")
+    st.caption("💡 提示：鼠标悬停在卡片上显示翻译，点击 🔊 瞬间朗读。")
     
-    # 这里定义每一课的内容逻辑 (以第一天为例)
-    content = {
-        "核心词": [
-            ("割り当てる", "わりあてる", "分配、分摊"),
-            ("見なす", "みなす", "看作、认为"),
-            ("執着", "しゅうちゃく", "执着、留恋")
-        ],
-        "例句": [
-            ("仕事を各チームに割り当てる。", "把工作分配给各小组。"),
-            ("それは一種の拒否と見なされる。", "那被看作是一种拒绝。")
-        ]
-    }
-
-    st.write("点击 🔊 听发音并查看翻译：")
-    for word, kana, trans in content["核心词"]:
-        c_p, c_t, c_btn = st.columns([2, 3, 1])
-        with c_p: st.markdown(f"<span class='jp-text'>{word}</span> <br><small>{kana}</small>", unsafe_allow_html=True)
-        with c_t: st.markdown(f"<span class='tr-text'>{trans}</span>", unsafe_allow_html=True)
-        with c_btn:
-            if st.button("🔊", key=word):
-                play_audio(word)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    st.subheader("⏱️ 专注计时")
-    if st.button("开启 40 分钟沉浸模式"):
-        st.toast("计时开始，手机请静音")
-        with st.empty():
-            for i in range(40*60, 0, -10):
-                st.write(f"⏳ 剩余时间: {i//60}分{i%60}秒")
-                time.sleep(0.1) # 演示用
-
-# 3. 课后：30个 N2 真题常用单词
-st.markdown("---")
-st.subheader("🎯 课后冲刺：N2 真题高频词 (30个)")
-
-# 模拟30个真题词汇
-exam_words = [
-    ("合致", "一致、符合"), ("兆し", "征兆"), ("素朴", "淳朴"),
-    ("妥協", "妥协"), ("漠然", "模糊"), ("閲覧", "阅读")
-] # 实际可扩充至30个
-
-cols = st.columns(3)
-for i, (w, m) in enumerate(exam_words):
-    with cols[i % 3]:
-        st.markdown(f"""
-        <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:10px; margin:5px;">
-            <b style="color:#fbbf24;">{w}</b>: {m}
+    for word, kana, trans, pure_jp in data['core_words']:
+        html_word = f"""
+        <div class="word-card">
+            <div class="word-jp">{word} <span style="font-size:0.8rem;color:#8b949e">({kana})</span></div>
+            <div class="word-tr">{trans}</div>
+            <button class="play-btn" onclick="speakJS('{pure_jp}')">🔊</button>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        st.markdown(html_word, unsafe_allow_html=True)
 
-# 4. 页脚美化
-st.markdown("<br><br><center style='color:#4b5563'>每一步努力，都在拉近你与日本的距离</center>", unsafe_allow_html=True)
+    # --- 模块 C: 沉浸式小作文解剖 (新增极其灵敏的发音) ---
+    st.markdown("---")
+    st.markdown("### 📝 沉浸式小作文解剖")
+    st.caption("💡 提示：点击整个句子方块可**放大并查看解析**。点击句子内的 🔊 按钮可**单独朗读该句**。")
+    
+    for i, sen in enumerate(data['essay']):
+        html_sentence = f"""
+        <div class="sentence-box" onclick="toggleBox(this)">
+            <div class="sen-jp">
+                {sen['jp']}
+                <button class="play-btn" onclick="speakJS('{sen['pure_jp']}', event)">🔊 读此句</button>
+            </div>
+            <div class="sen-tr">🇨🇳 翻译：{sen['tr']}</div>
+            <div class="sen-note">🔍 解析：{sen['note']}</div>
+        </div>
+        """
+        st.markdown(html_sentence, unsafe_allow_html=True)
+
+    # --- 模块 D: 课后 30 词冲刺 ---
+    st.markdown("---")
+    st.markdown("### 🎯 课后 30 词极速扫描")
+    
+    cols = st.columns(6)
+    for i, word in enumerate(data['sprint_30']):
+        with cols[i % 6]:
+            st.markdown(f"<div style='background:#161b22; padding:8px; text-align:center; border-radius:5px; margin-bottom:10px; border:1px solid #30363d;'>{word}</div>", unsafe_allow_html=True)
+
+else:
+    st.warning(f"🚧 恭喜你太超前了！{course_key} 的教案数据正在按计划编写导入中，请先复习已有课程。")
